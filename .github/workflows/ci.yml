@@ -1,0 +1,136 @@
+name: ci
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[ci skip]')"
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Get variables
+        run: |
+          image_version=$(grep "docker://quay.io/terraform-docs/gh-actions" action.yml | cut -d: -f4 | sed 's/"//g')
+          echo "image_version=${image_version}" >> "$GITHUB_ENV"
+
+      - name: Build Docker images
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          outputs: "type=image"
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: quay.io/terraform-docs/gh-actions:${{ env.image_version }}
+
+      - name: Should generate USAGE.md for tf11_basic
+        uses: ./
+        with:
+          working-dir: examples/tf11_basic
+          output-file: USAGE.md
+          template: |-
+            <!-- BEGIN_TF_DOCS -->
+            # Test tf11 basic
+
+            ## Verify
+
+            Should use the template defined instead of the default
+            Should inject the table under usage
+
+            # Usage
+
+            {{ .Content }}
+            <!-- END_TF_DOCS -->
+          indention: 3
+
+      - name: Should generate USAGE.md for tf11_extra_args
+        uses: ./
+        with:
+          working-dir: examples/tf11_extra_args
+          output-format: markdown document
+          output-file: USAGE.md
+          output-method: replace
+          args: --sensitive=false --hide requirements --required=false
+          indention: 3
+
+      - name: Should generate README.md for tf12_bsic
+        uses: ./
+        with:
+          working-dir: examples/tf12_basic
+          indention: 3
+
+      - name: Should generate README.md for tf12_atlantis
+        uses: ./
+        with:
+          atlantis-file: atlantis.yaml
+          args: --hide providers
+          indention: 3
+
+      - name: Should generate USAGE.md for tf12_find and its submodules
+        uses: ./
+        with:
+          find-dir: examples/tf12_find
+          output-file: USAGE.md
+
+      - name: Should generate USAGE.md for tf12_find and its submodules recursively
+        uses: ./
+        with:
+          working-dir: examples/tf12_find
+          output-file: USAGE.md
+          recursive: true
+          recursive-path: modules
+
+      - name: Should generate README.md for tf12_config
+        uses: ./
+        with:
+          working-dir: examples/tf12_config
+          config-file: .terraform-docs.yml
+
+      - name: Should generate README.md for tf12_inject and push up all changes
+        uses: ./
+        with:
+          working-dir: examples/tf12_inject
+          args: --sort-by required
+          indention: 3
+          git-push: true
+          git-push-sign-off: true
+          git-commit-message: "terraform-docs: automated action"
+
+      - name: Should generate README.md for tf12_fail_diff and fail on diff
+        continue-on-error: true
+        uses: ./
+        with:
+          working-dir: examples/tf12_fail_diff
+          indention: 3
+          fail-on-diff: true
+
+  format:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[ci skip]')"
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Terraform format
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: '0.12.17'
+
+      - run: terraform fmt examples

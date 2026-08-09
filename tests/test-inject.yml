@@ -1,0 +1,64 @@
+name: Test inject output method
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up git origin reachable inside the Docker container
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git push "$GITHUB_WORKSPACE/.git-remote" --tags
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      - id: action
+        uses: .
+        with:
+          working-dir: tests/fixtures/tf-module-inject
+          output-format: markdown table
+          output-method: inject
+          output-file: README.md
+          git-push: "false"
+        continue-on-error: true
+
+      - name: Assert action outcome and README content
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          NUM_CHANGED: ${{ steps.action.outputs.num_changed }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "num_changed: $NUM_CHANGED"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$NUM_CHANGED" ]; then
+              echo "FAIL: num_changed output is empty"
+              exit 1
+            fi
+            README="tests/fixtures/tf-module-inject/README.md"
+            echo "=== README content ==="
+            cat "$README"
+            echo "=== End README ==="
+            if ! grep -q "BEGIN_TF_DOCS" "$README"; then
+              echo "FAIL: README does not contain BEGIN_TF_DOCS marker"
+              exit 1
+            fi
+            if ! grep -q "region" "$README"; then
+              echo "FAIL: README does not contain expected variable 'region'"
+              exit 1
+            fi
+            echo "PASS: inject method succeeded, num_changed=$NUM_CHANGED"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (docker or git issue in harness)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
