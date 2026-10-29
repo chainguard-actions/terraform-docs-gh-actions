@@ -6,9 +6,9 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 ## Versions
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| v1.4.1 | [`v1.4.1`](https://github.com/chainguard-actions/terraform-docs-gh-actions/tree/v1.4.1) | [`6de6da0`](https://github.com/terraform-docs/gh-actions/commit/6de6da0cefcc6b4b7a5cbea4d79d97060733093c) |
+| Version | Tag | Upstream commit | Hardening report |
+|---------|-----|-----------------|------------------|
+| v1.4.1 | [`v1.4.1`](https://github.com/chainguard-actions/terraform-docs-gh-actions/tree/v1.4.1) | [`6de6da0`](https://github.com/terraform-docs/gh-actions/commit/6de6da0cefcc6b4b7a5cbea4d79d97060733093c) | [`HARDENING.md`](https://github.com/chainguard-actions/terraform-docs-gh-actions/blob/v1.4.1/HARDENING.md) |
 
 ## Privacy
 
